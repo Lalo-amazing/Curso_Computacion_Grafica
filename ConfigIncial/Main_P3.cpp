@@ -1,7 +1,7 @@
 #include<iostream>
 
 //#define GLEW_STATIC
-//Practica 3 
+//Previo3 3 
 //Nombre: León Ruiz Eduardo
 //N. cuenta: 421025550
 
