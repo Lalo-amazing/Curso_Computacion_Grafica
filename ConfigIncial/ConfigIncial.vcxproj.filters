@@ -21,6 +21,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Main_P3.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <None Include="Shader\core.frag">
       <Filter>Archivos de origen\Shader</Filter>
     </None>
@@ -29,8 +34,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main_Dibujo2D_P2.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
+    <ClInclude Include="Shader.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
