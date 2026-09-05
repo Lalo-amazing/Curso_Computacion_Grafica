@@ -16,14 +16,6 @@
     <Filter Include="Archivos de origen\Shader">
       <UniqueIdentifier>{9a232ebb-ea3b-4dbf-9b40-461f6657163c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Archivos de encabezado\Shader">
-      <UniqueIdentifier>{7a49be45-3c35-4b9d-bfd5-5beba5161cb1}</UniqueIdentifier>
-    </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Main_P3.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shader\core.frag">
@@ -32,6 +24,11 @@
     <None Include="Shader\core.vs">
       <Filter>Archivos de origen\Shader</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Main_Modelado.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shader.h">
