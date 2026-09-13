@@ -3,7 +3,7 @@
 //#define GLEW_STATIC
 //	Practica: 1 
 //	Grupo: 14 de lab de compu grafica.
-//	fecha de entrega: semana del 31 de agosto al 6 de septiembre, soy asdri
+//	fecha de entrega: 12 de septiembre de 2026
 //	Nombre: León Ruiz Eduardo
 //	No. de cuenta: 421025550
 
