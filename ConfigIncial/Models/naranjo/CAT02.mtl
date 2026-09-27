@@ -1,0 +1,13 @@
+# Blender 4.2.0 MTL File: 'CAT02.obj'
+# www.blender.org
+
+newmtl tripo_mat_61362500-76d9-402d-815a-45f9a3c865f8
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd Color_7c0ec996-cf6b-498a-a581-82a24d8f65b2.png
+map_d Color_7c0ec996-cf6b-498a-a581-82a24d8f65b2.png
+map_Bump -bm 1.000000 NormalGL_7c0ec996-cf6b-498a-a581-82a24d8f65b2.png

@@ -21,9 +21,9 @@
 #include "SOIL2/SOIL2.h"
 #include "stb_image.h"
 /*
-* Previo 6
+* Practica 6
 * León Ruiz Eduardo
-* Fecha de entrega: 21/09/2026
+* Fecha de entrega: 26/09/2026
 * No. Cuenta 421025550
 * Hola amiguis de git :)
 */
@@ -60,7 +60,7 @@ int main( )
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
     
     // Create a GLFWwindow object that we can use for GLFW's functions
-    GLFWwindow *window = glfwCreateWindow( WIDTH, HEIGHT, "Previo 6 - Eduardo León", nullptr, nullptr );
+    GLFWwindow *window = glfwCreateWindow( WIDTH, HEIGHT, "Practica 6 - Eduardo León", nullptr, nullptr );
     
     if ( nullptr == window )
     {
@@ -98,13 +98,49 @@ int main( )
     
     // Setup and compile our shaders
     Shader shader( "Shader/modelLoading.vs", "Shader/modelLoading.frag" );
-    
-    // Load models
-    Model dog((char*)"Models/RedDog.obj");
-    glm::mat4 projection = glm::perspective( camera.GetZoom( ), ( float )SCREEN_WIDTH/( float )SCREEN_HEIGHT, 0.1f, 100.0f );
-    
-  
+    GLfloat bgVertices[] = {
+        // Posiciones (X, Y, Z)     // Coordenadas UV
+        -12.0f,  9.0f, -5.0f,     0.0f, 1.0f,
+        -12.0f, -9.0f, -5.0f,     0.0f, 0.0f,
+         12.0f, -9.0f, -5.0f,     1.0f, 0.0f,
 
+        -12.0f,  9.0f, -5.0f,     0.0f, 1.0f,
+         12.0f, -9.0f, -5.0f,     1.0f, 0.0f,
+         12.0f,  9.0f, -5.0f,     1.0f, 1.0f
+    };
+
+    GLuint bgVAO, bgVBO;
+    glGenVertexArrays(1, &bgVAO);
+    glGenBuffers(1, &bgVBO);
+
+    glBindVertexArray(bgVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, bgVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(bgVertices), bgVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+
+    // Cargar la textura de la imagen de Minecraft
+    GLuint bgTexture = SOIL_load_OGL_texture(
+        "Textura/fondo01.jpg", // Asegúrate de ajustar la ruta y nombre de la imagen
+        SOIL_LOAD_AUTO,
+        SOIL_CREATE_NEW_ID,
+        SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y
+    );
+    if (bgTexture == 0) {
+        std::cout << "Error al cargar la textura del fondo. Revisa la ruta de la imagen." << std::endl;
+    }
+    // Load models
+    Model dog((char*)"Models/perro/RedDog.obj");
+    Model gato((char*)"Models/naranjo/CAT02.obj");
+    Model arbol((char*)"Models/oliver/Tree.obj");
+    Model manzana((char*)"Models/manzana/apple.obj");
+    Model cofre((char*)"Models/cofre/bau.obj");
+    glm::mat4 projection = glm::perspective(glm::radians(camera.GetZoom()), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
     // Game loop
     while (!glfwWindowShouldClose(window))
     {
@@ -126,17 +162,53 @@ int main( )
         glm::mat4 view = camera.GetViewMatrix();
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        //Fondo
+        glDepthMask(GL_FALSE); // Desactiva escritura en Z-Buffer para dejarlo siempre al fondo
 
+        glm::mat4 bgModel = glm::mat4(1.0f);
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(bgModel));
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, bgTexture);
+        glBindVertexArray(bgVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        glDepthMask(GL_TRUE);
         // Draw the loaded model
         //Inicializamos la matriz de modelo
-        glm::mat4 model(1);
+        // --- 1. MODELO PERRO (Izquierda) ---
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0f));
+        model = glm::scale(model, glm::vec3(1.2f, 1.2f, 1.2f));        // Escalado para ser visible y parejo con el gato
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
         dog.Draw(shader);
-        //Nuevo modelo
-        model = glm::translate(model, glm::vec3(1.0f, 1.0f, 1.0f));
-        model = glm::scale(model, glm::vec3(3.5f, 3.5f, 3.5f));
+
+        // --- 2. MODELO GATO (Centro) ---
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(0.8f, 0.8f, 0.8f));    // Ajustado de 0.012f a 0.12f para que aparezca al mismo tamaño del perro
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        dog.Draw(shader);
+        gato.Draw(shader);
+
+        // --- 3. MODELO ÁRBOL (Derecha) ---
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.8f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));        // Reducido para que sea el doble de alto que las mascotas sin ocupar toda la pantalla
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        arbol.Draw(shader);
+        // --- 4. MODELO Manzana (Al lado del gato) ---
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.2f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));        // Reducido para que sea el doble de alto que las mascotas sin ocupar toda la pantalla
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        manzana.Draw(shader);
+        // --- 5. MODELO cofre (Al lado del gato) ---
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.2f, 0.0f, -1.0f));
+        model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));        // Reducido para que sea el doble de alto que las mascotas sin ocupar toda la pantalla
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        cofre.Draw(shader);
         // Swap the buffers
         glfwSwapBuffers( window );
     }
