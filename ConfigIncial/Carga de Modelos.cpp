@@ -204,11 +204,11 @@ int main( )
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
         manzana.Draw(shader);
         // --- 5. MODELO cofre (Al lado del gato) ---
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(1.2f, 0.0f, -1.0f));
-        model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));        // Reducido para que sea el doble de alto que las mascotas sin ocupar toda la pantalla
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        cofre.Draw(shader);
+        //model = glm::mat4(1.0f);
+        //model = glm::translate(model, glm::vec3(1.2f, 0.0f, -1.0f));
+        //model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));        // Reducido para que sea el doble de alto que las mascotas sin ocupar toda la pantalla
+        //glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        //cofre.Draw(shader);
         // Swap the buffers
         glfwSwapBuffers( window );
     }
