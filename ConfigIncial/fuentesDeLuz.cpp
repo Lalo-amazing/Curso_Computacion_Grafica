@@ -158,7 +158,7 @@ int main()
 	
 	Model Dog((char*)"Models/perro/ball.obj");
 	Model Piso((char*)"Models/perro/piso.obj");
-
+	Model Arbol((char*)"Models/oliver/Tree.obj"); // <--- Agregado
 
 
 	// First, set the container's VAO (and VBO)
@@ -310,14 +310,32 @@ int main()
 
 	
 		model = glm::mat4(1);
-		glEnable(GL_BLEND);//Avtiva la funcionalidad para trabajar el canal alfa
+		//glEnable(GL_BLEND);//Avtiva la funcionalidad para trabajar el canal alfa
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 1);
 	    Dog.Draw(lightingShader);
-		glDisable(GL_BLEND);  //Desactiva el canal alfa 
+		//glDisable(GL_BLEND);  //Desactiva el canal alfa 
+
+		//Arbol con transparencia
+		model = glm::mat4(1);
+		model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f)); // Posición opcional a la derecha del perro
+		model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));     // Escala si lo necesitas más grande o pequeño
+
+		glEnable(GL_BLEND); // Activa la transparencia para las hojas del árbol
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 1);
+		Arbol.Draw(lightingShader);
+		glDisable(GL_BLEND); // Desactiva la transparencia
+
+
+
+
+
+
 		glBindVertexArray(0);
-	
+		
 
 		// Also draw the lamp object, again binding the appropriate shader
 		lampShader.Use();
