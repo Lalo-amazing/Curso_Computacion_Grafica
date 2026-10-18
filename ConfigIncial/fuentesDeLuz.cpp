@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cmath>
 // León Ruiz Eduardo
-// Previo 9
+// Practica 9
 // No. cuenta : 421025550
 // GLEW
 #include <GL/glew.h>
@@ -118,7 +118,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Previo9 - Eduardo León", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica9 - Eduardo León", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
@@ -159,7 +159,8 @@ int main()
 	Model Dog((char*)"Models/perro/ball.obj");
 	Model Piso((char*)"Models/perro/piso.obj");
 	Model Arbol((char*)"Models/oliver/Tree.obj"); // <--- Agregado
-
+	Model lampara((char*)"Models/lantern/lantern.obj");
+	Model sun((char*)"Models/sun/sundial.obj");
 
 	// First, set the container's VAO (and VBO)
 	GLuint VBO, VAO;
@@ -274,14 +275,38 @@ int main()
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.ambient"), 1.1f, 1.1f, 1.1f);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), 1.0f, 1.0f, 1.0f);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), 0.0f, 0.0f, 0.0f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.constant"), 2.0f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.linear"), 0.5f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.quadratic"), 0.9f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.constant"), 1.0f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.linear"), 0.7f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.quadratic"), 1.8f);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.cutOff"), glm::cos(glm::radians(12.0f)));
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.outerCutOff"), glm::cos(glm::radians(18.0f)));
 
+		//Luz del´poste
+		glm::vec3 posPoste = glm::vec3(2.0f, 0.0f, 0.0f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), posPoste.x, posPoste.y, posPoste.z);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].ambient"), 0.05f, 0.05f, 0.05f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].diffuse"), 2.0f, 2.0f, 2.8f); // Luz cálida de poste
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].specular"), 1.0f, 1.0f, 1.0f);
+
+		// Atenuación muy alta para que la luz no viaje lejos y solo afecte al objeto cercano
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].constant"), 1.0f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].linear"), 0.7f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].quadratic"), 1.8f);
 		// Set material properties
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "material.shininess"), 7.0f);
+
+		// --- LUZ PUNTUAL 2 (Para el nuevo objeto 'sun' al otro lado) ---
+		glm::vec3 posSun = glm::vec3(-2.0f, -0.5f, 0.0f); // Lado opuesto al poste (que está en 2.0f)
+
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].position"), posSun.x, posSun.y + 1.5f, posSun.z); // Altura de la luz
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].ambient"), 0.05f, 0.05f, 0.05f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].diffuse"), 1.0f, 2.0f, 2.0f); // Luz azulada/blanca brillante
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[1].specular"), 1.0f, 1.0f, 1.0f);
+
+		// Atenuación para que la luz decaiga de forma realista
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].constant"), 1.0f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].linear"), 0.09f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[1].quadratic"), 0.032f);
 
 		// Create camera transformations
 		glm::mat4 view;
@@ -296,18 +321,14 @@ int main()
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 		glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-
 		glm::mat4 model(1);
-
-	
-
 		//Carga de modelo 
         view = camera.GetViewMatrix();	
 		model = glm::mat4(1);
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		Piso.Draw(lightingShader);
 
-
+		
 	
 		model = glm::mat4(1);
 		//glEnable(GL_BLEND);//Avtiva la funcionalidad para trabajar el canal alfa
@@ -319,7 +340,7 @@ int main()
 
 		//Arbol con transparencia
 		model = glm::mat4(1);
-		model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f)); // Posición opcional a la derecha del perro
+		model = glm::translate(model, glm::vec3(1.0f, -0.5f, 0.0f)); // Posición opcional a la derecha del perro
 		model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));     // Escala si lo necesitas más grande o pequeño
 
 		glEnable(GL_BLEND); // Activa la transparencia para las hojas del árbol
@@ -329,9 +350,51 @@ int main()
 		Arbol.Draw(lightingShader);
 		glDisable(GL_BLEND); // Desactiva la transparencia
 
+		/*Arbol con luz como poste, pq no cargo el archivo fbx*/
+		model = glm::mat4(1);
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		Piso.Draw(lightingShader);
 
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(1.0f, -0.5f, 0.0f)); // Mismo valor que la luz (2.0f, 0.0f, 0.0f)
+		model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		lampara.Draw(lightingShader); 
 
+		// --- CUBO INDICADOR DEL FOCO (LAMP SHADER) ---
+		lampShader.Use();
+		GLint modelLoc = glGetUniformLocation(lampShader.Program, "model");
+		GLint viewLoc = glGetUniformLocation(lampShader.Program, "view");
+		GLint projLoc = glGetUniformLocation(lampShader.Program, "projection");
 
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+		glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+		model = glm::mat4(1.0f);
+
+	
+		model = glm::translate(model, glm::vec3(1.0f, 0.5f, 0.0f));
+
+		model = glm::scale(model, glm::vec3(0.15f, 0.15f, 0.15f)); // Tamaño pequeño del foco
+
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0);
+
+		// --- DIBUJAR NUEVO OBJETO (SUN / SUNDIAL) ---
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(-10.0f, -0.5f, 0.0f));                 // Ubicado al otro lado del piso (-2.0f, -0.5f, 0.0f)
+		model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f)); // Escala (cámbiala si se ve muy grande o pequeña)
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		sun.Draw(lightingShader);
+
+		/*model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(100.5f, 100.5f, 100.5f));     
+
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		lampara.Draw(lightingShader);*/ 
 
 
 		glBindVertexArray(0);
