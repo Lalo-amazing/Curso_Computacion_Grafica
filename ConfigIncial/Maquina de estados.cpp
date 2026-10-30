@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 // Eduardo León Ruiz 
-// Previo 11
+// Practica 11
 // GLEW
 #include <GL/glew.h>
 
@@ -118,16 +118,15 @@ glm::vec3 dogPos(0.0f, 0.0f, 0.0f);
 float dogRot = 0.0f;
 bool step = false;
 
-// ---------------------------------------------------------------
-// MAQUINA DE ESTADOS DEL PERRO
-//   DOG_IDLE     : reposo, antes de empezar
-//   DOG_WALK     : camina hacia adelante moviendo patas, cabeza y cola
-//   DOG_STOPPING : llego al limite del piso: frena y las partes regresan a su posicion neutra
-//   DOG_DONE     : detenido de forma definitiva (N lo reinicia)
-// Transiciones:  IDLE -> WALK -> STOPPING -> DONE
-//                WALK -> STOPPING cuando el siguiente paso sacaria al perro del piso
-// ---------------------------------------------------------------
-enum DogState { DOG_IDLE = 0, DOG_WALK = 1, DOG_STOPPING = 2, DOG_DONE = 3 };
+enum DogState { DOG_IDLE = 0, DOG_WALK = 1, DOG_STOPPING = 2, DOG_DONE = 3, DOG_TURN = 4 };
+
+// Ruta: lista de puntos (en el mundo) que el perro visita en orden
+std::vector<glm::vec3> path;
+int wpIndex = 1;                     // siguiente punto a visitar (el 0 es el de partida)
+float turnTarget = 0.0f;             // rumbo (grados) al que debe girar
+int stateAfterTurn = DOG_WALK;       // estado al terminar de girar
+const float turnSpeed = 120.0f;      // velocidad de giro (grados/seg)
+const int sweeps = 4;                // numero de diagonales de la ruta (mas = mas cerrada)
 
 // Offsets de las partes (los mismos que se usan al dibujar)
 const glm::vec3 offHead(0.0f, 0.093f, 0.208f);
@@ -176,15 +175,48 @@ Bounds ReadBounds(const char* path)
 	return r;
 }
 
-// Coloca al perro al inicio del recorrido (extremo del piso, centrado) y deja todo en reposo
+float dogRadius = 0.3f;                      // radio que ocupa el perro al girar (para no salirse del piso)
+
+// Construye la ruta que recorre todo el piso:
+//   1) recto por el borde izquierdo hasta el final del piso
+//   2) gira y avanza un paso lateral
+//   3) diagonal hacia el borde de partida; gira, paso lateral, diagonal... hasta cubrir todo el piso
+//   4) regresa por el borde derecho y por el borde de partida hasta el punto de inicio
+void BuildPath()
+{
+	float r = dogRadius + stopMargin;                     // margen para que ninguna parte salga del piso
+	float xL = floorMin.x + r, xR = floorMax.x - r;
+	float zB = floorMin.z + r, zF = floorMax.z - r;       // B = lado de partida, F = final del piso
+	float y = floorY - footY;                             // las patas apoyan en el piso
+	float s = (xR - xL) / (2.0f * sweeps);                // avance lateral por tramo
+
+	path.clear();
+	path.push_back(glm::vec3(xL, y, zB));                 // 0: punto de partida
+	path.push_back(glm::vec3(xL, y, zF));                 // 1: recto hasta el final del piso
+
+	float x = xL;
+	bool atFront = true;
+	for (int k = 0; k < sweeps; k++)
+	{
+		x += s;                                           // gira y avanza (paso lateral)
+		path.push_back(glm::vec3(x, y, atFront ? zF : zB));
+		x += s;                                           // diagonal hacia el borde opuesto
+		atFront = !atFront;
+		path.push_back(glm::vec3(x, y, atFront ? zF : zB));
+	}
+
+	if (atFront) path.push_back(glm::vec3(xR, y, zB));    // baja por el borde derecho
+	path.push_back(glm::vec3(xL, y, zB));                 // regresa al punto de partida
+}
+
+// Coloca al perro en el punto de partida y deja todo en reposo
 void ResetDog()
 {
-	dogPos = glm::vec3((floorMin.x + floorMax.x) * 0.5f,
-		floorY - footY,                      // las patas apoyan en el piso
-		floorMin.z + stopMargin - dogBack);  // la cola queda dentro del margen
+	if (!path.empty()) dogPos = path[0];
 	dogRot = 0.0f;
 	FLegs = RLegs = head = tail = 0.0f;
 	step = false;
+	wpIndex = 1;
 	dogAnim = DOG_IDLE;
 }
 
@@ -211,23 +243,22 @@ void LoadDogLimits()
 		glm::min(offBL.y + bl.mn.y, offBR.y + br.mn.y));
 
 	float dogLen = dogFront - dogBack;
-	walkSpeed = 0.5f * dogLen;
-	stopMargin = 0.06f * floorMinSide;
+	float halfWidth = glm::max(glm::abs(offFL.x) + fl.mx.x, glm::abs(offFR.x) + glm::abs(fr.mn.x));
+	dogRadius = glm::max(0.5f * dogLen, halfWidth);
+	walkSpeed = 0.8f * dogLen;                // largos de perro por segundo
+	stopMargin = 0.04f * floorMinSide;
 
 	std::cout << "Piso: " << (f.mx.x - f.mn.x) << " x " << (f.mx.z - f.mn.z)
 		<< " | Perro: largo = " << dogLen << std::endl;
 
+	BuildPath();
+	float total = 0.0f;
+	for (size_t i = 1; i < path.size(); i++) total += glm::length(path[i] - path[i - 1]);
+	std::cout << "Ruta: " << path.size() << " puntos, " << total << " unidades (~" << total / walkSpeed << " s)" << std::endl;
+
 	ResetDog();
 }
 
-// true si, al dar el siguiente paso, la parte delantera del perro invadiria el margen del borde
-bool WillLeaveFloor(float dt)
-{
-	glm::vec3 fwd(sin(glm::radians(dogRot)), 0.0f, cos(glm::radians(dogRot)));
-	glm::vec3 nextFront = dogPos + fwd * (walkSpeed * dt + dogFront);
-	return nextFront.x > floorMax.x - stopMargin || nextFront.x < floorMin.x + stopMargin ||
-		nextFront.z > floorMax.z - stopMargin || nextFront.z < floorMin.z + stopMargin;
-}
 
 // Deltatime
 GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
@@ -245,7 +276,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Previo 11 - Eduardo León", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica 11 - Eduardo León", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
@@ -636,6 +667,45 @@ static void Approach(float& v, float target, float maxDelta)
 	else            v = glm::max(v - maxDelta, target);
 }
 
+// Lleva un angulo al rango (-180, 180]
+static float WrapAngle(float a)
+{
+	while (a > 180.0f)   a -= 360.0f;
+	while (a <= -180.0f) a += 360.0f;
+	return a;
+}
+
+// Balanceo de patas (step indica el sentido); cabeza y cola siguen el ritmo
+static void SwingLimbs()
+{
+	const float legSwing = 20.0f;     // angulo maximo de las patas (grados)
+	const float legSpeed = 90.0f;     // velocidad de balanceo (grados/seg)
+	float d = step ? 1.0f : -1.0f;
+	FLegs += d * legSpeed * deltaTime;
+	if (FLegs >= legSwing) { FLegs = legSwing;  step = false; }
+	if (FLegs <= -legSwing) { FLegs = -legSwing; step = true; }
+	RLegs = FLegs;
+	head = 0.5f * FLegs;
+	tail = 1.25f * FLegs;
+}
+
+// Prepara el giro hacia el siguiente punto de la ruta (o hacia el rumbo inicial si ya no quedan)
+static void StartLeg()
+{
+	if (wpIndex < (int)path.size())
+	{
+		glm::vec3 d = path[wpIndex] - dogPos;
+		turnTarget = glm::degrees(atan2(d.x, d.z));      // 0 = +Z, 90 = +X
+		stateAfterTurn = DOG_WALK;
+	}
+	else
+	{
+		turnTarget = 0.0f;                               // termina mirando como al inicio
+		stateAfterTurn = DOG_STOPPING;
+	}
+	dogAnim = DOG_TURN;
+}
+
 void Animation() {
 	// Pelota: giro continuo (por tiempo, no por cuadro)
 	if (AnimBall)
@@ -645,36 +715,52 @@ void Animation() {
 
 	if (!AnimDog) return;
 
-	const float legSwing = 20.0f;     // angulo maximo de las patas (grados)
 	const float legSpeed = 90.0f;     // velocidad de balanceo (grados/seg)
 
 	switch (dogAnim)
 	{
 	case DOG_IDLE:
-		dogAnim = DOG_WALK;
+		StartLeg();
 		break;
+
+	case DOG_TURN:
+	{
+		// Gira por el camino mas corto hacia el rumbo objetivo, moviendo las patas en el lugar
+		float diff = WrapAngle(turnTarget - dogRot);
+		float maxStep = turnSpeed * deltaTime;
+		if (fabs(diff) <= maxStep)
+		{
+			dogRot = turnTarget;
+			dogAnim = stateAfterTurn;
+		}
+		else
+		{
+			dogRot += (diff > 0.0f ? maxStep : -maxStep);
+			SwingLimbs();
+		}
+		break;
+	}
 
 	case DOG_WALK:
 	{
-		// Si el siguiente paso saca al perro del piso -> estado STOPPING
-		if (WillLeaveFloor(deltaTime))
+		glm::vec3 d = path[wpIndex] - dogPos;
+		d.y = 0.0f;
+		float dist = glm::length(d);
+		float stepLen = walkSpeed * deltaTime;
+
+		if (dist <= stepLen)
 		{
-			dogAnim = DOG_STOPPING;
+			// Llego al punto: se coloca exacto en el y decide hacia donde girar
+			dogPos.x = path[wpIndex].x;
+			dogPos.z = path[wpIndex].z;
+			wpIndex++;
+			StartLeg();
 			break;
 		}
 
-		// Balanceo de patas (step indica el sentido); cabeza y cola siguen el ritmo
-		float d = step ? 1.0f : -1.0f;
-		FLegs += d * legSpeed * deltaTime;
-		if (FLegs >= legSwing) { FLegs = legSwing;  step = false; }
-		if (FLegs <= -legSwing) { FLegs = -legSwing; step = true; }
-		RLegs = FLegs;
-		head = 0.5f * FLegs;
-		tail = 1.25f * FLegs;
-
-		// Avance en la direccion en que mira el perro
-		dogPos.x += sin(glm::radians(dogRot)) * walkSpeed * deltaTime;
-		dogPos.z += cos(glm::radians(dogRot)) * walkSpeed * deltaTime;
+		SwingLimbs();
+		dogPos.x += d.x / dist * stepLen;
+		dogPos.z += d.z / dist * stepLen;
 		break;
 	}
 
