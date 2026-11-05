@@ -8,7 +8,7 @@
 #include <algorithm>
 //	Eduardo León Ruiz
 //	No. Cuenta --> 421025550
-//	Previo 12
+//	Práctica 12
 // 
 // GLEW
 #include <GL/glew.h>
@@ -121,18 +121,19 @@ float FLegL = 0.0f;      // pata delantera izquierda
 float FLegR = 0.0f;      // pata delantera derecha  (la que saluda)
 float BLegL = 0.0f;      // pata trasera izquierda
 float BLegR = 0.0f;      // pata trasera derecha
+float bodyRoll = 0.0f;   // giro del cuerpo sobre su eje largo: 90 = de lado, 180 = boca arriba (muertito)
 float bodyPitch = 0.0f;  // inclinacion del cuerpo: negativo = levanta el frente (para sentarse)
 
 //KeyFrames
 float dogPosX = 0.0f, dogPosY = 0.0f, dogPosZ = 0.0f;
 
 #define MAX_FRAMES 24
-#define NUM_PARAMS 11
-enum { P_X, P_Y, P_Z, P_ROT, P_HEAD, P_TAIL, P_FLL, P_FLR, P_BLL, P_BLR, P_PITCH };
+#define NUM_PARAMS 12
+enum { P_X, P_Y, P_Z, P_ROT, P_HEAD, P_TAIL, P_FLL, P_FLR, P_BLL, P_BLR, P_PITCH, P_ROLL };
 
 // Cada parametro animable apunta a su variable viva
 float* paramVar[NUM_PARAMS] = { &dogPosX, &dogPosY, &dogPosZ, &rotDog, &head, &tail,
-								&FLegL, &FLegR, &BLegL, &BLegR, &bodyPitch };
+								&FLegL, &FLegR, &BLegL, &BLegR, &bodyPitch, &bodyRoll };
 
 int i_max_steps = 190;      // pasos de interpolacion por defecto (a 60 FPS ~ 3 s)
 int i_curr_steps = 0;
@@ -174,17 +175,17 @@ void printFrames(void)
 	for (int i = 0; i < FrameIndex; i++)
 	{
 		const float* v = KeyFrame[i].value;
-		printf("setFrame(%d, %.4ff, %.4ff, %.4ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %d);\n",
-			i, v[P_X], v[P_Y], v[P_Z], v[P_ROT], v[P_HEAD], v[P_TAIL], v[P_FLL], v[P_FLR], v[P_BLL], v[P_BLR], v[P_PITCH],
+		printf("setFrame(%d, %.4ff, %.4ff, %.4ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %d);\n",
+			i, v[P_X], v[P_Y], v[P_Z], v[P_ROT], v[P_HEAD], v[P_TAIL], v[P_FLL], v[P_FLR], v[P_BLL], v[P_BLR], v[P_PITCH], v[P_ROLL],
 			KeyFrame[i].steps);
 	}
 	printf("FrameIndex = %d;\n\n", FrameIndex);
 }
 
 void setFrame(int i, float x, float y, float z, float rot, float hd, float tl,
-	float fl, float fr, float bl, float br, float pitch, int steps)
+	float fl, float fr, float bl, float br, float pitch, float roll, int steps)
 {
-	float v[NUM_PARAMS] = { x, y, z, rot, hd, tl, fl, fr, bl, br, pitch };
+	float v[NUM_PARAMS] = { x, y, z, rot, hd, tl, fl, fr, bl, br, pitch, roll };
 	for (int p = 0; p < NUM_PARAMS; p++) { KeyFrame[i].value[p] = v[p]; KeyFrame[i].inc[p] = 0.0f; }
 	KeyFrame[i].steps = steps;
 }
@@ -222,9 +223,10 @@ static void LoadVerts(const char* path, std::vector<glm::vec3>& out)
 }
 
 // Altura minima (en Y) de todo el perro para una pose dada, con el cuerpo en el origen
-static float LowestY(float pitch, float fl, float fr, float bl, float br)
+static float LowestY(float pitch, float roll, float fl, float fr, float bl, float br)
 {
-	glm::mat4 P = glm::rotate(glm::mat4(1.0f), glm::radians(pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 P = glm::rotate(glm::mat4(1.0f), glm::radians(pitch), glm::vec3(1.0f, 0.0f, 0.0f))
+		* glm::rotate(glm::mat4(1.0f), glm::radians(roll), glm::vec3(0.0f, 0.0f, 1.0f));
 	float lo = 1e9f;
 	auto test = [&](const PartGeo& g, float ang)
 		{
@@ -240,14 +242,14 @@ static float LowestY(float pitch, float fl, float fr, float bl, float br)
 
 void StandPose(void)
 {
-	dogPosY = standY; bodyPitch = 0.0f;
+	dogPosY = standY; bodyPitch = 0.0f; bodyRoll = 0.0f;
 	FLegL = FLegR = BLegL = BLegR = 0.0f;
 	head = 0.0f; tail = 0.0f;
 }
 
 void SitPose(void)
 {
-	dogPosY = sitY; bodyPitch = sitPitch;
+	dogPosY = sitY; bodyPitch = sitPitch; bodyRoll = 0.0f;
 	FLegL = FLegR = sitFront; BLegL = BLegR = sitBack;
 	head = 0.0f; tail = 0.0f;
 }
@@ -257,15 +259,54 @@ void LoadDefaultAnimation(void)
 {
 	float x = dogPosX, z = dogPosZ, r = 0.0f;
 	//         i    x  y      z  rot head tail  FLL       FLR   BLL      BLR      pitch     pasos
-	setFrame(0, x, standY, z, r, 0, 0, 0, 0, 0, 0, 0, 190);  // de pie
-	setFrame(1, x, sitY, z, r, 0, 0, sitFront, sitFront, sitBack, sitBack, sitPitch, 60);   // sentado
-	setFrame(2, x, sitY, z, r, 0, 0, sitFront, sitFront, sitBack, sitBack, sitPitch, 120);  // pausa breve
-	setFrame(3, x, sitY, z, r, 0, 20, sitFront, -75, sitBack, sitBack, sitPitch, 50);   // levanta la pata derecha
-	setFrame(4, x, sitY, z, r, 0, -20, sitFront, -55, sitBack, sitBack, sitPitch, 50);   // saluda (abajo)
-	setFrame(5, x, sitY, z, r, 0, 20, sitFront, -90, sitBack, sitBack, sitPitch, 50);   // saluda (arriba)
-	setFrame(6, x, sitY, z, r, 0, -20, sitFront, -55, sitBack, sitBack, sitPitch, 50);
-	setFrame(7, x, sitY, z, r, 0, 20, sitFront, -90, sitBack, sitBack, sitPitch, 120);
-	setFrame(8, x, sitY, z, r, 0, 0, sitFront, sitFront, sitBack, sitBack, sitPitch, 0);    // baja la pata
+	setFrame(0, x, standY, z, r, 0, 0, 0, 0, 0, 0, 0, 0.0f, 190);  // de pie
+	setFrame(1, x, sitY, z, r, 0, 0, sitFront, sitFront, sitBack, sitBack, sitPitch, 0.0f, 60);   // sentado
+	setFrame(2, x, sitY, z, r, 0, 0, sitFront, sitFront, sitBack, sitBack, sitPitch, 0.0f, 120);  // pausa breve
+	setFrame(3, x, sitY, z, r, 0, 20, sitFront, -75, sitBack, sitBack, sitPitch, 0.0f, 50);   // levanta la pata derecha
+	setFrame(4, x, sitY, z, r, 0, -20, sitFront, -55, sitBack, sitBack, sitPitch, 0.0f, 50);   // saluda (abajo)
+	setFrame(5, x, sitY, z, r, 0, 20, sitFront, -90, sitBack, sitBack, sitPitch, 0.0f, 50);   // saluda (arriba)
+	setFrame(6, x, sitY, z, r, 0, -20, sitFront, -55, sitBack, sitBack, sitPitch, 0.0f, 50);
+	setFrame(7, x, sitY, z, r, 0, 20, sitFront, -90, sitBack, sitBack, sitPitch, 0.0f, 120);
+	setFrame(8, x, sitY, z, r, 0, 0, sitFront, sitFront, sitBack, sitBack, sitPitch, 0.0f, 0);    // baja la pata
+	FrameIndex = 9;
+	play = false;
+}
+
+// Altura (Y) a la que debe estar el cuerpo para que la pose quede apoyada en el piso
+static float YFor(float pitch, float roll, float fl, float fr, float bl, float br)
+{
+	return floorY - LowestY(pitch, roll, fl, fr, bl, br);
+}
+
+// Pose final del muertito: boca arriba, patas al aire, cabeza y cola flojas
+void DeadPose(void)
+{
+	FLegL = -35.0f; FLegR = -45.0f; BLegL = 20.0f; BLegR = 35.0f;
+	bodyPitch = 0.0f; bodyRoll = 180.0f;
+	dogPosY = YFor(bodyPitch, bodyRoll, FLegL, FLegR, BLegL, BLegR);
+	head = 35.0f; tail = 25.0f;
+}
+
+// Animacion pregrabada: el perro se hace el muertito (se tambalea, cae, rueda y se queda boca arriba)
+// Cada fotograma calcula su altura Y con la geometria real del perro, asi nunca se hunde en el piso.
+void LoadPlayDeadAnimation(void)
+{
+	float x = dogPosX, z = dogPosZ, r = 0.0f;
+	//  i, head, tail, FLL, FLR, BLL, BLR, pitch, roll, pasos
+	auto F = [&](int i, float hd, float tl, float fl, float fr, float bl, float br, float pitch, float roll, int steps)
+		{
+			setFrame(i, x, YFor(pitch, roll, fl, fr, bl, br), z, r, hd, tl, fl, fr, bl, br, pitch, roll, steps);
+		};
+
+	F(0, 0, 0, 0, 0, 0, 0, 0, 0, 50);   // de pie
+	F(1, 20, -10, -5, -5, 5, 5, 0, 8, 40);   // se tambalea hacia un lado
+	F(2, -20, 10, -5, -5, 5, 5, 0, -8, 40);   // y hacia el otro
+	F(3, 25, -15, 35, 35, 10, 10, 15, 10, 50);   // las patas delanteras se doblan (cae de nariz)
+	F(4, 30, 15, -20, -20, 10, 10, 0, 90, 45);   // se tira de lado (rapido)
+	F(5, 35, 25, -35, -45, 20, 35, 0, 180, 70);   // rueda y queda boca arriba, patas al aire
+	F(6, 45, 30, -55, -65, 25, 40, 0, 180, 90);   // las patas se aflojan
+	F(7, 45, 30, -60, -40, 35, 40, 0, 180, 20);   // ultimo espasmo
+	F(8, 45, 30, -55, -65, 25, 40, 0, 180, 0);    // inmovil
 	FrameIndex = 9;
 	play = false;
 }
@@ -292,8 +333,8 @@ void LoadDogGeometry(void)
 	LoadVerts("Models/perro/B_LeftLegDog.obj", gBL.v);       gBL.off = glm::vec3(0.082f, -0.046f, -0.218f);
 	LoadVerts("Models/perro/B_RightLegDog.obj", gBR.v);      gBR.off = glm::vec3(-0.083f, -0.057f, -0.231f);
 
-	standY = floorY - LowestY(0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-	sitY = floorY - LowestY(sitPitch, sitFront, sitFront, sitBack, sitBack);
+	standY = floorY - LowestY(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	sitY = floorY - LowestY(sitPitch, 0.0f, sitFront, sitFront, sitBack, sitBack);
 
 	dogPosX = floorCenter.x;
 	dogPosZ = floorCenter.z;
@@ -332,7 +373,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Previo 12 - Eduardo León", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Práctica 12 - Eduardo León", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
@@ -386,8 +427,9 @@ int main()
 
 	// Geometria del perro, camara, animacion pregrabada y pose inicial
 	LoadDogGeometry();
-	LoadDefaultAnimation();
+	LoadPlayDeadAnimation();   // animacion por defecto: el muertito (tecla 1 = saludo, tecla 6 = muertito)
 	StandPose();
+	std::cout << "L: reproducir | 6: muertito | 1: sentarse y saludar | 0: de pie | 9: pose muerto | P: imprimir fotogramas" << std::endl;
 
 
 	// First, set the container's VAO (and VBO)
@@ -522,6 +564,7 @@ int main()
 		modelTemp = model = glm::translate(model, glm::vec3(dogPosX, dogPosY, dogPosZ));
 		modelTemp = model = glm::rotate(model, glm::radians(rotDog), glm::vec3(0.0f, 1.0f, 0.0f));
 		modelTemp = model = glm::rotate(model, glm::radians(bodyPitch), glm::vec3(1.0f, 0.0f, 0.0f));   // inclinacion (sentarse)
+		modelTemp = model = glm::rotate(model, glm::radians(bodyRoll), glm::vec3(0.0f, 0.0f, 1.0f));    // giro sobre su eje largo (muertito)
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		DogBody.Draw(lightingShader);
 		//Head
@@ -633,6 +676,8 @@ void DoMovement()
 	if (keys[GLFW_KEY_M]) tail += rate;
 	if (keys[GLFW_KEY_I]) bodyPitch -= rate;   // inclinacion del cuerpo
 	if (keys[GLFW_KEY_O]) bodyPitch += rate;
+	if (keys[GLFW_KEY_COMMA]) bodyRoll -= rate;    // giro lateral del cuerpo (de lado / boca arriba)
+	if (keys[GLFW_KEY_PERIOD]) bodyRoll += rate;
 	if (keys[GLFW_KEY_8]) dogPosY -= 0.2f * deltaTime;   // altura
 	if (keys[GLFW_KEY_9]) dogPosY += 0.2f * deltaTime;
 
@@ -779,9 +824,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 	{
 		if (key == GLFW_KEY_P) printFrames();                                  // imprime los fotogramas como codigo
 		if (key == GLFW_KEY_X) { FrameIndex = 0; play = false; printf("fotogramas borrados\n"); }
-		if (key == GLFW_KEY_1) { play = false; LoadDefaultAnimation(); StandPose(); printf("animacion pregrabada cargada\n"); }
+		if (key == GLFW_KEY_1) { play = false; LoadDefaultAnimation(); StandPose(); printf("animacion de saludo cargada\n"); }
 		if (key == GLFW_KEY_0) { play = false; StandPose(); }                  // pose de pie
 		if (key == GLFW_KEY_7) { play = false; SitPose(); }                    // pose sentado
+		if (key == GLFW_KEY_6) { play = false; LoadPlayDeadAnimation(); StandPose(); printf("animacion del muertito cargada\n"); }
+		if (key == GLFW_KEY_9) { play = false; DeadPose(); }       // pose de muertito
 	}
 
 	if (GLFW_KEY_ESCAPE == key && GLFW_PRESS == action)
